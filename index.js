@@ -22,12 +22,12 @@ mongoose.connect(dbUrl, connectionParams)
     console.log("Error:", e);
   });
 
-const userSchema = new mongoose.Schema({
+const userCustomerSchema  = new mongoose.Schema({
   username: String,
   password: String,
 });
 
-const User = mongoose.model("User", userSchema);
+const UserCustomer = mongoose.model("UserCustomer", userCustomerSchema);
 
 const bookSchema = new mongoose.Schema({
   title: String,
@@ -68,11 +68,11 @@ app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const user = await User.findOne({ username });
+    const user = await UserCustomer.findOne({ username });
 
     if (user && await bcrypt.compare(password, user.password)) {
       req.session.userId = user._id;
-      res.redirect("/dashboard");
+      res.redirect("/");
     } else {
       res.status(401).send("Tên đăng nhập hoặc mật khẩu không đúng");
     }
@@ -82,6 +82,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
+
 app.get("/register", (req, res) => {
   res.sendFile(__dirname + "/register.html");
 });
@@ -90,13 +91,13 @@ app.post("/register", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const existingUser = await User.findOne({ username });
+    const existingUser = await UserCustomer.findOne({ username });
 
     if (existingUser) {
       res.status(400).send("Tên đăng nhập đã tồn tại");
     } else {
       const hashedPassword = await bcrypt.hash(password, 10);
-      const newUser = new User({ username, password: hashedPassword });
+      const newUser = new UserCustomer({ username, password: hashedPassword });
       await newUser.save();
       res.status(200).send("Đăng ký thành công. Đăng nhập để tiếp tục.");
     }
@@ -135,6 +136,30 @@ app.get("/book/:id", async (req, res) => {
 
 app.get("/detailBook.html", (req, res) => {
   res.sendFile(__dirname + "/detailBook.html");
+});
+
+app.get("/search", async (req, res) => {
+  const searchTerm = req.query.query;
+
+  try {
+    // Sử dụng biểu thức chính quy để tìm kiếm sách theo tên sách
+    const searchResults = await Book.find({ title: { $regex: new RegExp(searchTerm, 'i') } });
+
+    res.status(200).json(searchResults);
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+      if (err) {
+          console.error("Error:", err);
+      } else {
+          res.redirect("/");
+      }
+  });
 });
 
 app.listen(port, () => {
