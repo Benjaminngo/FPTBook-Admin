@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/css/bootstrap.min.css">
+</head>
+
+<body class="bg-light">
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col-md-4">
+        <h2>Add a new book</h2>
+        <form id="book-form" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="book-title">Book's Name:</label>
+            <input type="text" class="form-control" id="book-title" name="book-title" required>
+          </div>
+          <div class="form-group">
+            <label for="author">Author:</label>
+            <input type="text" class="form-control" id="author" name="author" required>
+          </div>
+          <div class="form-group">
+            <label for="publication-year">Publishing year:</label>
+            <input type="number" class="form-control" id="publication-year" name="publication-year" required>
+          </div>
+          <div class="form-group">
+            <label for="category">Category:</label>
+            <input type="text" class="form-control" id="category" name="category" required>
+          </div>
+          <div class="form-group">
+            <label for="content">Content:</label>
+            <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" id="add-book-button">Add</button>
+          <button type="button" class="btn btn-warning" id="update-book-button" style="display: none;">Update</button>
+          <button type="button" class="btn btn-secondary" id="cancel-update-button" style="display: none;">Cancel</button>
+        </form>
+      </div>
+      <div class="col-md-8">
+        <h2>List of books</h2>
+        <div class="input-group mb-3">
+          <input type="text" class="form-control" id="search-input" placeholder="Search...">
+          <div class="input-group-append">
+            <button class="btn btn-outline-secondary" type="button" id="search-button">Search</button>
+          </div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Book's Name</th>
+              <th>Author</th>
+              <th>Publishing year</th>
+              <th>Categories</th>
+              <th>Content</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="book-list">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.min.js"></script>
+  <script>
+    const MAX_CONTENT_LENGTH = 50;
+    const READ_MORE_TEXT = "Read more";
+    const READ_LESS_TEXT = "Collapse";
+
+    document.getElementById("book-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = document.getElementById("book-title").value;
+      const author = document.getElementById("author").value;
+      const publicationYear = document.getElementById("publication-year").value;
+      const category = document.getElementById("category").value;
+      const content = document.getElementById("content").value;
+
+      const response = await fetch("/add-book", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title, author, publicationYear, category, content }),
+      });
+
+      if (response.ok) {
+        fetchBooks();
+      } else {
+        alert("Error adding books.");
+      }
+    });
+
+    document.getElementById("search-button").addEventListener("click", () => {
+      const searchInput = document.getElementById("search-input").value.toLowerCase();
+      filterProducts(searchInput);
+    });
+
+    async function deleteBook(bookId) {
+      try {
+        const response = await fetch(`/delete-book/${bookId}`, {
+          method: "DELETE",
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.message) {
+            console.log(result.message);
+            fetchBooks();
+          } else {
+            console.error("Unexpected response format:", result);
+            alert("An unexpected error occurred. Please try again later.");
+          }
+        } else {
+          console.error("Error while deleting books. Please try again.");
+        }
+      } catch (error) {
+        console.error("Error while deleting books:", error);
+        alert("An unexpected error occurred. Please try again later.");
+      }
+    }
+
+    async function fetchBooks() {
+      const response = await fetch("/get-books");
+      if (response.ok) {
+        const books = await response.json();
+        displayBooks(books);
+      }
+    }
+
+    function displayBooks(books) {
+      const bookList = document.getElementById("book-list");
+      bookList.innerHTML = "";
+
+      books.forEach((book) => {
+        const row = document.createElement("tr");
+        const titleCell = document.createElement("td");
+        titleCell.textContent = book.title;
+        const authorCell = document.createElement("td");
+        authorCell.textContent = book.author;
+        const publicationYearCell = document.createElement("td");
+        publicationYearCell.textContent = book.publicationYear;
+        const categoryCell = document.createElement("td");
+        categoryCell.textContent = book.category;
+
+
+        const contentCell = document.createElement("td");
+        const contentText = book.content.length > MAX_CONTENT_LENGTH
+          ? `${book.content.substring(0, MAX_CONTENT_LENGTH)}...`
+          : book.content;
+        contentCell.textContent = book.content;
+
+        contentCell.textContent = contentText;
+
+        const expandButton = document.createElement("button");
+        expandButton.textContent = book.content.length > MAX_CONTENT_LENGTH
+          ? READ_MORE_TEXT
+          : READ_LESS_TEXT;
+
+        expandButton.className = "btn btn-link btn-sm";
+        expandButton.addEventListener("click", () => {
+          if (contentCell.textContent.length > MAX_CONTENT_LENGTH) {
+            contentCell.textContent = book.content;
+            expandButton.textContent = READ_LESS_TEXT;
+          } else {
+            contentCell.textContent = `${book.content.substring(0, MAX_CONTENT_LENGTH)}...`;
+            expandButton.textContent = READ_MORE_TEXT;
+          }
+        });
+
+        contentCell.appendChild(expandButton);
+        row.appendChild(contentCell);
+
+        const actionCell = document.createElement("td");
+        const deleteButton = document.createElement("button");
+        deleteButton.textContent = "Delete";
+        deleteButton.className = "btn btn-danger btn-sm";
+        deleteButton.addEventListener("click", () => {
+          deleteBook(book._id);
+        });
+
+        const editButton = document.createElement("button");
+        editButton.textContent = "Edit";
+        editButton.className = "btn btn-primary btn-sm ml-2";
+        editButton.addEventListener("click", () => {
+          editBook(book._id, book.title, book.author, book.publicationYear, book.category, book.content);
+        });
+
+        actionCell.appendChild(deleteButton);
+        actionCell.appendChild(editButton);
+
+        row.appendChild(titleCell);
+        row.appendChild(authorCell);
+        row.appendChild(publicationYearCell);
+        row.appendChild(categoryCell);
+        row.appendChild(contentCell);
+        row.appendChild(actionCell);
+
+        bookList.appendChild(row);
+      });
+    }
+
+    function filterProducts(searchText) {
+      const bookList = document.getElementById("book-list");
+      const rows = bookList.getElementsByTagName("tr");
+
+      for (let i = 0; i < rows.length; i++) {
+        const nameCell = rows[i].getElementsByTagName("td")[0];
+        const productName = nameCell.textContent.toLowerCase();
+
+        if (productName.includes(searchText)) {
+          rows[i].style.display = "";
+        } else {
+          rows[i].style.display = "none";
+        }
+      }
+    }
+
+
+    let editingBookId = null;
+
+    function editBook(id, title, author, publicationYear, category, content) {
+      editingBookId = id;
+      document.getElementById("book-title").value = title;
+      document.getElementById("author").value = author;
+      document.getElementById("publication-year").value = publicationYear;
+      document.getElementById("category").value = category;
+      document.getElementById("content").value = content;
+
+      document.getElementById("add-book-button").style.display = "none";
+      document.getElementById("update-book-button").style.display = "inline-block";
+      document.getElementById("cancel-update-button").style.display = "inline-block";
+    }
+
+    document.getElementById("cancel-update-button").addEventListener("click", () => {
+      clearForm();
+    });
+
+    document.getElementById("update-book-button").addEventListener("click", async () => {
+      const title = document.getElementById("book-title").value;
+      const author = document.getElementById("author").value;
+      const publicationYear = document.getElementById("publication-year").value;
+      const category = document.getElementById("category").value;
+      const content = document.getElementById("content").value;
+
+      if (title && author && publicationYear && category && content) {
+        await updateBook(editingBookId, title, author, publicationYear, category, content);
+        clearForm();
+      } else {
+        alert("Please fill in the book information completely.");
+      }
+    });
+
+    function clearForm() {
+      editingBookId = null;
+      document.getElementById("book-title").value = "";
+      document.getElementById("author").value = "";
+      document.getElementById("publication-year").value = "";
+      document.getElementById("category").value = "";
+      document.getElementById("content").value = "";
+
+      document.getElementById("add-book-button").style.display = "inline-block";
+      document.getElementById("update-book-button").style.display = "none";
+      document.getElementById("cancel-update-button").style.display = "none";
+    }
+
+    async function updateBook(id, title, author, publicationYear, category, content) {
+      try {
+        const response = await fetch(`/update-book/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ title, author, publicationYear, category, content }),
+        });
+
+        if (response.ok) {
+          fetchBooks();
+        } else {
+          alert("Error updating books.");
+        }
+      } catch (error) {
+        console.error("Error when updating books:", error);
+        alert("An unexpected error occurred. Please try again later.");
+      }
+    }
+
+    fetchBooks();
+  </script>
+</body>
+
+</html>
